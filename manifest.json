@@ -1,0 +1,29 @@
+{
+  "manifest_version": 2,
+
+  "name": "PageSigner",
+  "description": "PageSigner - a cryptographically secure webpage screenshot tool",
+  "version": "3.0.4.2",
+  "author": "TLSNotary Group",
+
+  "permissions": [
+    "webRequest",
+    "activeTab",
+    "https://tlsnotary.org/backup_oracle"
+  ],
+
+  "icons": {
+    "64": "ui/img/icon64.png"
+  },
+
+  "browser_action": {
+    "default_icon": "ui/img/icon.png",
+    "default_popup": "ui/html/popup.html"
+  },
+
+  "background": {
+    "page": "background.html"
+  },
+
+ "content_security_policy": "script-src 'self' 'unsafe-eval' 'wasm-eval'; object-src 'self'"
+}
