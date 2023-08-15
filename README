@@ -1,0 +1,15 @@
+PageSigner - a cryptographically secure webpage screenshot tool.
+
+PageSigner is a Chromium extension implementing a client for the TLSNotary protocol.
+
+You can install PageSigner from Chrome webstore:
+
+https://chrome.google.com/webstore/detail/pagesigner/abblaaeblmamacadkdmnejjikbdkemcj
+
+
+Or you can install it by cloning this repo with:
+
+- git clone --recurse-submodules https://github.com/tlsnotary/pagesigner
+- go to chrome://extensions and Enable "Developer mode"
+- Click "Load unpacked" 
+- Navigate inside pagesigner's top folder and click Open.
