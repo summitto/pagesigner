@@ -32,7 +32,7 @@ export class TLSNotarySession{
     if ( this.pm) this.pm.update('last_stage', {'current': 4, 'total': 10});
 
     await this.tls.buildClientKeyExchange(cpubBytes);
-    const [cr, sr] = await this.tls.getRandoms();
+    const [cr, sr] = this.tls.getRandoms();
     const [encCF, tagCF, vdCF] = await this.twopc.run(cr, sr, this.tls.getAllHandshakes(), pmsShare);
     // Finished (0x14) with length 12 (0x0c)
     this.tls.updateAllHandshakes(concatTA(new Uint8Array([0x14, 0x00, 0x00, 0x0c]), vdCF));
@@ -51,14 +51,15 @@ export class TLSNotarySession{
     const serverRecords = await this.tls.receiveServerResponse();
     await this.tls.sckt.close();
 
-    const commitHash = await TLSNotarySession.computeCommitHash(serverRecords);
     const [cwkShare, civShare, swkShare, sivShare] = this.twopc.getKeyShares();
-    const keyShareHash = await sha256(concatTA(cwkShare, civShare, swkShare, sivShare));
-    const pmsShareHash = await sha256(pmsShare);
-    const data5 = await this.twopc.send('commitHash', concatTA(
-      commitHash,
-      keyShareHash,
-      pmsShareHash));
+    const [commitHash, cwkShareHash, civShareHash, swkShareHash, sivShareHash] = await Promise.all([
+      TLSNotarySession.computeCommitHash(serverRecords),
+      sha256(cwkShare),
+      sha256(civShare),
+      sha256(swkShare),
+      sha256(sivShare),
+    ])
+    const data5 = await this.twopc.send('commitHash', concatTA(commitHash, cwkShareHash, civShareHash, swkShareHash, sivShareHash));
     this.twopc.destroy();
 
     let o = 0; // offset
@@ -94,9 +95,13 @@ export class TLSNotarySession{
       'notary server_write_key share': notarySwkShare,
       'notary server_write_iv share': notarySivShare,
       'client client_write_key share': cwkShare,
+      'client client_write_key share commitment': cwkShareHash,
       'client client_write_iv share': civShare,
+      'client client_write_iv share commitment': civShareHash,
       'client server_write_key share': swkShare,
+      'client server_write_key share commitment': swkShareHash,
       'client server_write_iv share': sivShare,
+      'client server_write_iv share commitment': sivShareHash,
       'client request ciphertext': ghashInputsBlob,
       'server response records': serverRecords,
       'session signature': signature,

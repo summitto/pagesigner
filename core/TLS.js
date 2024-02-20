@@ -572,9 +572,9 @@ function uint8ArrayToSixByteStringArray(input) {
 }
 
 /**
- * @returns {{ plaintext: Uint8Array[], inputsList: string[], tagIvList: string[], aadList: string[] }}
+ * @returns {Promise<{ plaintext: Uint8Array[], inputsList: string[], tagIvList: string[], aadList: string[] }>}
  */
-export async function decrypt_tls_responseV6(encRecords, key, IV){
+export async function decrypt_tls_responseV6(encRecords, key, IV, clientSwk, clientSwkHash){
   const cryptoKey = await crypto.subtle.importKey(
     'raw', key.buffer, 'AES-GCM', true, ['decrypt']);
 
@@ -606,6 +606,8 @@ export async function decrypt_tls_responseV6(encRecords, key, IV){
 
     const witnesses = JSON.stringify({
       "ciphertext": uint8ArrayToStringArray(rec.slice(8)),
+      "client_swk_share": uint8ArrayToStringArray(clientSwk),
+      "share_commitment": uint8ArrayToStringArray(clientSwkHash),
       "key": uint8ArrayToStringArray(key),
       "nonce": uint8ArrayToStringArray(nonce)
     });

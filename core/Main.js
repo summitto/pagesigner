@@ -746,14 +746,15 @@ export class Main{
     assert(obj['title'] === 'PageSigner notarization file');
     assert(obj['version'] === 6);
 
+    let notaryPubkey;
     // Step 1. Verify URLFetcher attestation doc and get notary's pubkey
-    if (!useNotaryNoSandbox){
+    if (!useNotaryNoSandbox) {
       // by default we verify that the notary is indeed a properly sandboxed machine
-      var URLFetcherDoc = obj['URLFetcher attestation'];
-      var notaryPubkey = await verifyNotary(URLFetcherDoc);
+      const URLFetcherDoc = obj['URLFetcher attestation'];
+      notaryPubkey = await verifyNotary(URLFetcherDoc);
     }
     else {
-      // notaryPubkey = this.trustedOracle.pubkeyPEM;
+      notaryPubkey = this.trustedOracle.pubkeyPEM;
     }
 
     // Step 2. Verify certificate chain validity (at the time of notarization)
@@ -798,21 +799,21 @@ export class Main{
     assert(eq( xor(notarySivShare, clientSivShare), siv));
 
     // Step 6. Check session signature
-    const commitHash = await TLSNotarySession.computeCommitHash(obj['server response records']);
-    const keyShareHash = await sha256(concatTA(clientCwkShare, clientCivShare,
-      clientSwkShare, clientSivShare));
-    const pmsShareHash = await sha256(obj['client PMS share']);
+    const [commitHash, clientCwkShareHash, clientCivShareHash, clientSwkShareHash, clientSivShareHash] = await Promise.all([
+      TLSNotarySession.computeCommitHash(obj['server response records']),
+      sha256(clientCwkShare),
+      sha256(clientCivShare),
+      sha256(clientSwkShare),
+      sha256(clientSivShare),
+    ])
     const tbs1 = concatTA(
       commitHash,
-      keyShareHash,
-      pmsShareHash,
+      clientCwkShareHash,
+      clientCivShareHash,
+      clientSwkShareHash,
+      clientSivShareHash,
       obj['client request ciphertext'],
       serverEcPubkey,
-      obj['notary PMS share'],
-      notaryCwkShare,
-      notaryCivShare,
-      notarySwkShare,
-      notarySivShare,
       obj['notarization time']);
 
     assert(await verifySig(
@@ -822,20 +823,20 @@ export class Main{
     'Session signature verification failed.');
 
     // Step 7. Verify ephemeral key
-    // const tbs2 = concatTA(
-    //   obj['ephemeral valid from'],
-    //   obj['ephemeral valid until'],
-    //   obj['ephemeral pubkey']);
-    // assert(await verifySig(
-    //   pubkeyPEM2raw(notaryPubkey),
-    //   obj['ephemeral signed by master key'],
-    //   tbs2) === true,
-    // 'Master key signature verification failed.');
-    // // notarization time must be within the time of ephemeral key validity
-    // assert(
-    //   ba2int(obj['ephemeral valid from']) <
-    //   ba2int(obj['notarization time']) <
-    //   ba2int(obj['ephemeral valid until']));
+    const tbs2 = concatTA(
+      obj['ephemeral valid from'],
+      obj['ephemeral valid until'],
+      obj['ephemeral pubkey']);
+    assert(await verifySig(
+      pubkeyPEM2raw(notaryPubkey),
+      obj['ephemeral signed by master key'],
+      tbs2) === true,
+    'Master key signature verification failed.');
+    // notarization time must be within the time of ephemeral key validity
+    assert(
+      ba2int(obj['ephemeral valid from']) <
+      ba2int(obj['notarization time']) <
+      ba2int(obj['ephemeral valid until']));
 
 
     // Step 8. Decrypt client request and make sure that "Host" HTTP header corresponds to
@@ -885,7 +886,7 @@ export class Main{
 
     // Step 9. Check authentication tags of server response and decrypt it.
     const { plaintext, inputsList, tagIvList, aadList } = await decrypt_tls_responseV6(
-      obj['server response records'], swk, siv);
+      obj['server response records'], swk, siv, clientSwkShare, clientSwkShareHash);
     const response = ba2str(concatTA(...plaintext));
     return {
       host,
